@@ -32,12 +32,6 @@ unsigned char *serilized_network(Network_Block *packet){
 
 Network_Block *deserilized_network(unsigned char *buffer){
     Network_Block *packet = (Network_Block *)malloc(sizeof(Network_Block));
-
-        if (packet == NULL) {
-            // Handle memory allocation error
-            return NULL;
-        }
-
         unsigned char *ptr = buffer;
 
         memcpy(&packet->version, ptr, sizeof(int));
