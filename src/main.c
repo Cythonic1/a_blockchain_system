@@ -1,5 +1,4 @@
 #include "./block.h"
-#include "./serilaization.h"
 #include "./network.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,8 +17,6 @@ int main() {
 
     // Ask user to add more blocks dynamically
     while (1) {
-        // unsigned char *buffer = serilized(last_block);
-        // deserilized(buffer);
         packet->data = last_block;
         packet->content_len = last_block->content_len + (2*sizeof(int)) + sizeof(time_t) + (2 * SHA256_DIGEST_LENGTH);  // Update content_len
         printf("-------------------------------Network serilized ------------------\n");
