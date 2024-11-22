@@ -15,13 +15,24 @@
 // }Network_Block ;
 
 
-// i should make sure that the packet contains data before serilize it.
-unsigned char *serilized_network(Network_Block *packet){
-    // int data_size = packet->data->content_len;
-    int buffer_len = (sizeof(int) * 2) + sizeof(packet->message_type) + packet->content_len;
-    unsigned char *buffer = (unsigned char *)malloc(buffer_len);
-    unsigned char *ptr = buffer;
 
+P2P_network *init_p2p(){
+    P2P_network *p2p  = (P2P_network *) malloc(sizeof(P2P_network));
+    p2p->connecd_nodes_number = 0;
+    return p2p;
+}
+
+// i should make sure that the packet contains data before serilize it.
+Buffer *serilized_network(Network_Block *packet){
+    // Here we allocate dynamic twice one for the struct it self and \
+    // one for the char pointer within the struct
+    Buffer *buf = (Buffer *)malloc(sizeof(Buffer));
+    int buffer_len = (sizeof(int) * 2) + sizeof(packet->message_type) + packet->content_len;
+
+    buf->buffer = (unsigned char *)malloc(buffer_len);
+    buf->size = buffer_len;
+    
+    unsigned char *ptr = buf->buffer;
     memcpy(ptr, &packet->version, sizeof(int));
     ptr+= sizeof(int);
     memcpy(ptr, &packet->content_len, sizeof(int));
@@ -29,12 +40,12 @@ unsigned char *serilized_network(Network_Block *packet){
     memcpy(ptr, &packet->message_type, sizeof(packet->message_type));
     ptr+= sizeof(packet->message_type);
     memcpy(ptr,  serilized(packet->data) , packet->content_len);
-    return buffer;
+    return buf;
 }
 
-Network_Block *deserilized_network(unsigned char *buffer){
+Network_Block *deserilized_network(Buffer *buffer){
     Network_Block *packet = (Network_Block *)malloc(sizeof(Network_Block));
-        unsigned char *ptr = buffer;
+        unsigned char *ptr = buffer->buffer;
 
         memcpy(&packet->version, ptr, sizeof(int));
         ptr += sizeof(int);
@@ -61,7 +72,7 @@ Network_Block *deserilized_network(unsigned char *buffer){
             packet->data = NULL;
         }
 
-        return packet;;
+        return packet;
 }
 
 void print_packet(Network_Block *packet){
@@ -76,7 +87,6 @@ void print_packet(Network_Block *packet){
 Node *socket_gen(int lport){
 
     Node *node = malloc(sizeof(Node));
-    node->connecd_nodes_number = 0;
     if(node == NULL){
         perror("Error while allocating memory for the node");
         exit(MEMORY_ALLOCATION_ERROR);
@@ -105,7 +115,9 @@ Node *socket_gen(int lport){
     return node;
 }
 
-void make_socket_listen(Node *node, int backlog){
+
+// SO this function will set up a listener on a common port for nodes that want to connect.
+void make_socket_listen(Node *node, int backlog, P2P_network *p2p){
     // This represnt the new connected node
     struct sockaddr_in next_node_tmp;
     int client;
@@ -129,7 +141,7 @@ void make_socket_listen(Node *node, int backlog){
             new_node->fd = client;
             new_node->conn_node = next_node_tmp;
             // The array will take an address refres to the new connected nodes.
-            node->nodes[node->connecd_nodes_number++] = new_node;
+            p2p->nodes[p2p->connecd_nodes_number++] = new_node;
             // Next a new thread should be created an move this data to that thread;
         };
     }
@@ -140,16 +152,16 @@ void make_socket_listen(Node *node, int backlog){
 // Since we are serilizing the Network block message we just
 // need to get the buffer thats hold the value
 // Also its a good idea to free the unsigned char buffer;
-void broadcast(Node *node, unsigned char *serilized_message){
+void broadcast(Node *node, Buffer *serilized_message, P2P_network *p2p){
     if(node == NULL){
         perror("node is null can not broadcast the block");
         exit(NULL_NODE);
     }
 
-    for(int i = 0; i < node->connecd_nodes_number ; i++){
+    for(int i = 0; i < p2p->connecd_nodes_number ; i++){
         // TODO: the size of the buffer i have not calculatd yet it should be input too for the funtion
         // For now we just gonna stick with this.
-        int number_of_sent_bytes = send(node->nodes[i]->fd, serilized_message, 1024, 0);
+        int number_of_sent_bytes = send(p2p->nodes[i]->fd, serilized_message->buffer, serilized_message->size, 0);
     }
     printf("The block has been broadcast");
     free(serilized_message);
@@ -157,5 +169,22 @@ void broadcast(Node *node, unsigned char *serilized_message){
 
 
 
-// I actually make it easy for my self since my node->nodes array holds the other node
+// I actually make it easy for my self since my p2p->nodes array holds the other node
 // inforamtion i can just refres to each other node IP in order to connect to them.
+void connecter(){
+    // TODO: First am thinking of making a function that listen on some port \
+    // and this should be common between all nodes so they can find themself on that port.
+}
+
+// Make this function so that it send a broadcast message on UDP \ 
+// When other node receives this message they replay with their IP \
+// So we can establish TCP connection. and also we need to validate the node\
+// so that we can be sure that this node is not malicious
+//  Why UDP, As you may know TCP does not support broadcast by nature since they are \
+//  connectionful network protocol. you can referes to broadcasr function to see how we can \
+//  send broadcast via TCP.
+// Refrence : https://cs.baylor.edu/~donahoo/practical/CSockets/code/BroadcastSender.c
+// https://cs.baylor.edu/~donahoo/practical/CSockets/code/BroadcastReceiver.c
+void discover_nodes(){
+
+}

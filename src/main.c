@@ -20,9 +20,9 @@ int main() {
         packet->data = last_block;
         packet->content_len = last_block->content_len + (2*sizeof(int)) + sizeof(time_t) + (2 * SHA256_DIGEST_LENGTH);  // Update content_len
         printf("-------------------------------Network serilized ------------------\n");
-        unsigned char *network_buffer = serilized_network(packet);
+        Buffer *network_buffer = serilized_network(packet);
         for (int i = 0; i < packet->content_len; i++) {
-            printf("%02x", network_buffer[i]);
+            printf("%02x", network_buffer->buffer[i]);
         }
         printf("\n");
         Network_Block *tmp = deserilized_network(network_buffer);
