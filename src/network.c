@@ -1,4 +1,5 @@
 #include "./network.h"
+#include <unistd.h>
 #include "./serilaization.h"
 #include "block.h"
 #include <netinet/in.h>
@@ -185,6 +186,74 @@ void connecter(){
 //  send broadcast via TCP.
 // Refrence : https://cs.baylor.edu/~donahoo/practical/CSockets/code/BroadcastSender.c
 // https://cs.baylor.edu/~donahoo/practical/CSockets/code/BroadcastReceiver.c
-void discover_nodes(){
+// TODO: Fix the returns values .
+void *discover_nodes(){
+    printf("Am starting as new thread \n");
+    int discover_socket ;
+    struct sockaddr_in broadcast;
+    int broadcasrPermission = 1;
+    char *string = "ping";
+    int buffer_len = strlen(string);
 
+
+    if ((discover_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+        perror("Erorr while creating broadcasr socket ");
+        return NULL;
+    }
+
+    // Setting the udp socket to allow broadcast
+    if((setsockopt(discover_socket, SOL_SOCKET, SO_BROADCAST,(void *) &broadcasrPermission, sizeof(int))) < 0){
+        perror("Error while setting the socket");
+        return NULL;
+    }
+    broadcast.sin_port = htons(BROAD_CAST_PORT_NUMBER);
+    broadcast.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    broadcast.sin_family = AF_INET;
+    memset(&broadcast.sin_zero, 0, sizeof(broadcast.sin_zero));
+
+    while(1){
+        if(sendto(discover_socket, string, buffer_len, 0, (struct sockaddr *) &broadcast, sizeof(struct sockaddr)) != buffer_len){
+            perror("Some Error occurs");
+            return NULL;
+        }
+        sleep(3);
+
+    }
+
+
+}
+
+
+
+void *listen_for_new_nodes(P2P_network *network){
+    int rec_socket ;
+    struct sockaddr_in discovered_node;
+    Buffer *buffer = NULL;
+    int rec_string_len;
+    
+    if((rec_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
+        perror("Error while creating listen socket");
+    }
+
+    discovered_node.sin_family = AF_INET;
+    discovered_node.sin_port = htons(BROAD_CAST_PORT_NUMBER);
+    discovered_node.sin_addr.s_addr = htonl(INADDR_ANY);
+    memset(&discovered_node.sin_zero, 0, sizeof(discovered_node.sin_port));
+
+    if(bind(rec_socket, (struct sockaddr *) &discovered_node, sizeof(struct sockaddr)) < 0){
+        perror("Something went wrong while bind the listener of the udp");
+    }
+
+
+    if((buffer->size = recvfrom(rec_socket, buffer->buffer, 255, 0, NULL, 0)) < 0){
+        perror("Error while reciving from the client via udp");
+    }
+
+    buffer->buffer[buffer->size] = '\0';
+    printf("recive from client : %s", buffer->buffer);
+
+
+    close(rec_socket);
+
+    return NULL;
 }

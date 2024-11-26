@@ -1,5 +1,6 @@
 #include "./block.h"
 #include "./network.h"
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 // Main function demonstrating dynamic block creation and linking
@@ -17,6 +18,10 @@ int main() {
 
     // Ask user to add more blocks dynamically
     while (1) {
+        pthread_t  thread;
+        if (pthread_create(&thread,NULL, discover_nodes, NULL ) != 0 ){
+            perror("Error while creating thread to discover nodes\n");
+        }
         packet->data = last_block;
         packet->content_len = last_block->content_len + (2*sizeof(int)) + sizeof(time_t) + (2 * SHA256_DIGEST_LENGTH);  // Update content_len
         printf("-------------------------------Network serilized ------------------\n");

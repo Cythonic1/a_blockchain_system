@@ -14,6 +14,7 @@
 #define LISTEN_SOCKET_ERROR -104
 #define MEMORY_ALLOCATION_ERROR -201
 #define DEFAULT_PORT_NUMBER_FOR_SOCKET 9988 // for listen
+#define BROAD_CAST_PORT_NUMBER 8899
 
 enum Message{
     BLOCK_MESSAGE
@@ -66,4 +67,5 @@ typedef struct Buffer{
 Buffer *serilized_network(Network_Block *packet);
 Network_Block *deserilized_network(Buffer *buffer);
 void print_packet(Network_Block *packet);
+void *discover_nodes();
 #endif
