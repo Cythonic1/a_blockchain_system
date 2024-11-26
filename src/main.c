@@ -15,13 +15,22 @@ int main() {
     // Create the first block (it will not have a previous block)
     first_block = create_block("Hello World", NULL);
     last_block = first_block;  // Set last_block to point to the first block
+    P2P_network *network = malloc(sizeof(P2P_network));
+    if (network == NULL) {
+        perror("Failed to allocate memory for P2P_network");
+        return EXIT_FAILURE;
+    }
 
+    pthread_t  thread;
+    if (pthread_create(&thread,NULL, discover_nodes, NULL ) != 0 ){
+        perror("Error while creating thread to discover nodes\n");
+    }
+    pthread_t  thread1;
+    if (pthread_create(&thread1,NULL, listen_for_new_nodes, network ) != 0 ){
+        perror("Error while creating thread to discover nodes\n");
+    }
     // Ask user to add more blocks dynamically
     while (1) {
-        pthread_t  thread;
-        if (pthread_create(&thread,NULL, discover_nodes, NULL ) != 0 ){
-            perror("Error while creating thread to discover nodes\n");
-        }
         packet->data = last_block;
         packet->content_len = last_block->content_len + (2*sizeof(int)) + sizeof(time_t) + (2 * SHA256_DIGEST_LENGTH);  // Update content_len
         printf("-------------------------------Network serilized ------------------\n");

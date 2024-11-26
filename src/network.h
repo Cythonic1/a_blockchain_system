@@ -68,4 +68,6 @@ Buffer *serilized_network(Network_Block *packet);
 Network_Block *deserilized_network(Buffer *buffer);
 void print_packet(Network_Block *packet);
 void *discover_nodes();
+void *listen_for_new_nodes(void *arg);
+
 #endif

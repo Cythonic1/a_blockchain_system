@@ -225,10 +225,12 @@ void *discover_nodes(){
 
 
 
-void *listen_for_new_nodes(P2P_network *network){
+void *listen_for_new_nodes(void *arg){
+    printf("am listen_for_new_nodes : \n");
+    // P2P_network *network = (P2P_network *) arg;
     int rec_socket ;
     struct sockaddr_in discovered_node;
-    Buffer *buffer = NULL;
+    Buffer *buffer ;
     int rec_string_len;
     
     if((rec_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
@@ -238,7 +240,7 @@ void *listen_for_new_nodes(P2P_network *network){
     discovered_node.sin_family = AF_INET;
     discovered_node.sin_port = htons(BROAD_CAST_PORT_NUMBER);
     discovered_node.sin_addr.s_addr = htonl(INADDR_ANY);
-    memset(&discovered_node.sin_zero, 0, sizeof(discovered_node.sin_port));
+    memset(&discovered_node.sin_zero, 0, sizeof(discovered_node.sin_zero));
 
     if(bind(rec_socket, (struct sockaddr *) &discovered_node, sizeof(struct sockaddr)) < 0){
         perror("Something went wrong while bind the listener of the udp");
