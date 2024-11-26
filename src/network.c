@@ -225,18 +225,29 @@ void *discover_nodes(){
 
 
 
+//TODO ! implement a way to ignore the localIP packets.
 void *listen_for_new_nodes(void *arg){
     printf("am listen_for_new_nodes : \n");
     // P2P_network *network = (P2P_network *) arg;
     int rec_socket ;
     struct sockaddr_in discovered_node;
-    Buffer *buffer ;
+    struct sockaddr_in new_client;
+    socklen_t clien_address_len = sizeof(struct sockaddr_in);
+    Buffer *buffer = (Buffer *) malloc(sizeof(Buffer));
+    if(buffer == NULL){
+        perror("Error while allocating for listen function");
+        exit(MEMORY_ALLOCATION_ERROR);
+    }
+    buffer->buffer = (unsigned char *) malloc(255);
+    if(buffer->buffer == NULL){
+        perror("Error while allocating for listen function");
+        exit(MEMORY_ALLOCATION_ERROR);
+    }
     int rec_string_len;
     
     if((rec_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
         perror("Error while creating listen socket");
     }
-
     discovered_node.sin_family = AF_INET;
     discovered_node.sin_port = htons(BROAD_CAST_PORT_NUMBER);
     discovered_node.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -246,16 +257,18 @@ void *listen_for_new_nodes(void *arg){
         perror("Something went wrong while bind the listener of the udp");
     }
 
-
-    if((buffer->size = recvfrom(rec_socket, buffer->buffer, 255, 0, NULL, 0)) < 0){
-        perror("Error while reciving from the client via udp");
+    while (1) {
+        if((buffer->size = recvfrom(rec_socket, buffer->buffer, 255, 0, (struct sockaddr *)&new_client, &clien_address_len)) < 0){
+            perror("Error while reciving from the client via udp");
+            free(buffer->buffer);
+            free(buffer);
+        }
+        printf("new client connected from %s:%i", inet_ntoa(new_client.sin_addr), ntohs(new_client.sin_port));
+        buffer->buffer[buffer->size] = '\0';
+        printf("\n recive from client : %s \n", buffer->buffer);
     }
-
-    buffer->buffer[buffer->size] = '\0';
-    printf("recive from client : %s", buffer->buffer);
-
-
     close(rec_socket);
-
+    free(buffer->buffer);
+    free(buffer);
     return NULL;
 }
