@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <arpa/inet.h>
 // typedef struct Network_Block{
 //     int version;
@@ -224,6 +226,44 @@ void *discover_nodes(){
 }
 
 
+char *get_current_host_IP(const char *interface) {
+    int fd;
+    struct ifreq ifr;
+    char *ip_address = malloc(INET_ADDRSTRLEN); // Allocate memory for the IP address string
+
+    if (!ip_address) {
+        perror("Memory allocation failed");
+        return NULL;
+    }
+
+    // Create a socket
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == -1) {
+        perror("Cannot create the socket to get the IP address");
+        free(ip_address);
+        return NULL;
+    }
+
+    // Copy the interface name into the ifreq structure
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ - 1);
+    ifr.ifr_name[IFNAMSIZ - 1] = '\0'; // Ensure null termination
+
+    // Get the IP address of the interface
+    if (ioctl(fd, SIOCGIFADDR, &ifr) == -1) {
+        perror("Error in getting IP via IOCTL");
+        close(fd);
+        free(ip_address);
+        return NULL;
+    }
+
+    close(fd);
+
+    // Extract the IP address
+    struct sockaddr_in *ip = (struct sockaddr_in *)&ifr.ifr_addr;
+    strcpy(ip_address, inet_ntoa(ip->sin_addr));
+
+    return ip_address;
+}
 
 //TODO ! implement a way to ignore the localIP packets.
 void *listen_for_new_nodes(void *arg){
@@ -263,6 +303,12 @@ void *listen_for_new_nodes(void *arg){
             free(buffer->buffer);
             free(buffer);
         }
+
+        if(strncmp(get_current_host_IP("wlan0"), inet_ntoa(new_client.sin_addr), INET_ADDRSTRLEN) == 0){
+            printf("Skipping the nodes its the current host\n");
+            continue;
+        }
+
         printf("new client connected from %s:%i", inet_ntoa(new_client.sin_addr), ntohs(new_client.sin_port));
         buffer->buffer[buffer->size] = '\0';
         printf("\n recive from client : %s \n", buffer->buffer);
