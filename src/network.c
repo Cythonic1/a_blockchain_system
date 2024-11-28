@@ -174,12 +174,14 @@ void broadcast(Node *node, Buffer *serilized_message, P2P_network *p2p){
 
 // I actually make it easy for my self since my p2p->nodes array holds the other node
 // inforamtion i can just refres to each other node IP in order to connect to them.
+// NOTE implement this you should keep in mind the to add mute lock and figure out later 
+// do we need to open it as new threat or run it on the same threat as the listen_for_new_nodes function.
 void connecter(){
     // TODO: First am thinking of making a function that listen on some port \
     // and this should be common between all nodes so they can find themself on that port.
 }
 
-// Make this function so that it send a broadcast message on UDP \ 
+// Make this function so that it send a broadcast message on UDP 
 // When other node receives this message they replay with their IP \
 // So we can establish TCP connection. and also we need to validate the node\
 // so that we can be sure that this node is not malicious
@@ -189,6 +191,7 @@ void connecter(){
 // Refrence : https://cs.baylor.edu/~donahoo/practical/CSockets/code/BroadcastSender.c
 // https://cs.baylor.edu/~donahoo/practical/CSockets/code/BroadcastReceiver.c
 // TODO: Fix the returns values .
+// TODO: Implement the udp message which include the node inforamtion. 
 void *discover_nodes(){
     printf("Am starting as new thread \n");
     int discover_socket ;
@@ -226,46 +229,40 @@ void *discover_nodes(){
 }
 
 
-char *get_current_host_IP(const char *interface) {
+int get_current_host_IP(const char *interface, char *ip_address, size_t size) {
     int fd;
     struct ifreq ifr;
-    char *ip_address = malloc(INET_ADDRSTRLEN); // Allocate memory for the IP address string
 
-    if (!ip_address) {
-        perror("Memory allocation failed");
-        return NULL;
-    }
-
-    // Create a socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         perror("Cannot create the socket to get the IP address");
-        free(ip_address);
-        return NULL;
+        return -1;
     }
 
     // Copy the interface name into the ifreq structure
     strncpy(ifr.ifr_name, interface, IFNAMSIZ - 1);
-    ifr.ifr_name[IFNAMSIZ - 1] = '\0'; // Ensure null termination
+    ifr.ifr_name[IFNAMSIZ - 1] = '\0'; 
 
     // Get the IP address of the interface
     if (ioctl(fd, SIOCGIFADDR, &ifr) == -1) {
         perror("Error in getting IP via IOCTL");
         close(fd);
-        free(ip_address);
-        return NULL;
+        return -1;
     }
 
     close(fd);
 
-    // Extract the IP address
+    // Extract the IP address into the provided buffer
     struct sockaddr_in *ip = (struct sockaddr_in *)&ifr.ifr_addr;
-    strcpy(ip_address, inet_ntoa(ip->sin_addr));
+    if (!inet_ntop(AF_INET, &ip->sin_addr, ip_address, size)) {
+        perror("inet_ntop failed");
+        return -1;
+    }
 
-    return ip_address;
+    return 0;
 }
 
-//TODO ! implement a way to ignore the localIP packets.
+//TODO implement adding the found device into our p2p network
 void *listen_for_new_nodes(void *arg){
     printf("am listen_for_new_nodes : \n");
     // P2P_network *network = (P2P_network *) arg;
@@ -274,6 +271,9 @@ void *listen_for_new_nodes(void *arg){
     struct sockaddr_in new_client;
     socklen_t clien_address_len = sizeof(struct sockaddr_in);
     Buffer *buffer = (Buffer *) malloc(sizeof(Buffer));
+    char current_ip[INET_ADDRSTRLEN];
+    int rec_string_len;
+
     if(buffer == NULL){
         perror("Error while allocating for listen function");
         exit(MEMORY_ALLOCATION_ERROR);
@@ -283,7 +283,6 @@ void *listen_for_new_nodes(void *arg){
         perror("Error while allocating for listen function");
         exit(MEMORY_ALLOCATION_ERROR);
     }
-    int rec_string_len;
     
     if((rec_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
         perror("Error while creating listen socket");
@@ -291,23 +290,42 @@ void *listen_for_new_nodes(void *arg){
     discovered_node.sin_family = AF_INET;
     discovered_node.sin_port = htons(BROAD_CAST_PORT_NUMBER);
     discovered_node.sin_addr.s_addr = htonl(INADDR_ANY);
-    memset(&discovered_node.sin_zero, 0, sizeof(discovered_node.sin_zero));
+   memset(&discovered_node.sin_zero, 0, sizeof(discovered_node.sin_zero));
+   
+    // Get current host IP
+    if (get_current_host_IP("eth0", current_ip, sizeof(current_ip)) != 0) {
+        perror("Failed to retrieve current host IP");
+        free(buffer->buffer);
+        free(buffer);
+        close(rec_socket);
+        exit(EXIT_FAILURE);
+    }
 
     if(bind(rec_socket, (struct sockaddr *) &discovered_node, sizeof(struct sockaddr)) < 0){
+        free(buffer->buffer);
+        free(buffer);
         perror("Something went wrong while bind the listener of the udp");
     }
 
     while (1) {
         if((buffer->size = recvfrom(rec_socket, buffer->buffer, 255, 0, (struct sockaddr *)&new_client, &clien_address_len)) < 0){
             perror("Error while reciving from the client via udp");
+            // NOTE HERE.
             free(buffer->buffer);
             free(buffer);
         }
 
-        if(strncmp(get_current_host_IP("wlan0"), inet_ntoa(new_client.sin_addr), INET_ADDRSTRLEN) == 0){
-            printf("Skipping the nodes its the current host\n");
+        char client_ip[INET_ADDRSTRLEN];
+        if (!inet_ntop(AF_INET, &new_client.sin_addr, client_ip, sizeof(client_ip))) {
+            perror("inet_ntop failed");
             continue;
         }
+
+        if (strcmp(current_ip, client_ip) == 0) {
+            printf("Skipping the node, it's the current host\n");
+            continue;
+        }
+
 
         printf("new client connected from %s:%i", inet_ntoa(new_client.sin_addr), ntohs(new_client.sin_port));
         buffer->buffer[buffer->size] = '\0';
