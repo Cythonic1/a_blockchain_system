@@ -25,4 +25,6 @@ make && ./blockchain
   <li>Implement some important functions regarding the network communication</li>
   <li>Implement structures to manage the sockets also a strctures to manage the connected nodes</li>
   <li>Implement broadcast function to broadcast a network serialized block</li>
+  <li> Implement UDP host discovery </li>
 </ul>
+
