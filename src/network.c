@@ -1,4 +1,5 @@
 #include "./network.h"
+#include <pthread.h>
 #include <unistd.h>
 #include "./serilaization.h"
 #include "block.h"
@@ -42,7 +43,9 @@ Buffer *serilized_network(Network_Block *packet){
     ptr+= sizeof(int);
     memcpy(ptr, &packet->message_type, sizeof(packet->message_type));
     ptr+= sizeof(packet->message_type);
-    memcpy(ptr,  serilized(packet->data) , packet->content_len);
+    unsigned char *packet_data = serilized(packet->data);
+    memcpy(ptr,  packet_data , packet->content_len);
+    free(packet_data);
     return buf;
 }
 
@@ -120,6 +123,7 @@ Node *socket_gen(int lport){
 
 
 // SO this function will set up a listener on a common port for nodes that want to connect.
+// TODO IMplement clean up handler
 void make_socket_listen(Node *node, int backlog, P2P_network *p2p){
     // This represnt the new connected node
     struct sockaddr_in next_node_tmp;
@@ -140,8 +144,10 @@ void make_socket_listen(Node *node, int backlog, P2P_network *p2p){
     while (1){
         // This will return the file discriptor of the new connected node.
         if((client = accept(node->socket, (struct sockaddr *) &next_node_tmp, &socket_length)) < 0){
-            Connected_Node_Info *new_node = malloc(sizeof(Connected_Node_Info));
+            Connected_Node_Info *new_node = (Connected_Node_Info *)malloc(sizeof(Connected_Node_Info)); 
+            // connect will return file discriptor of the connected node
             new_node->fd = client;
+            // and this will be the info of the next node;
             new_node->conn_node = next_node_tmp;
             // The array will take an address refres to the new connected nodes.
             p2p->nodes[p2p->connecd_nodes_number++] = new_node;
@@ -230,18 +236,17 @@ void *discover_nodes(){
 
 
 int get_current_host_IP(const char *interface, char *ip_address, size_t size) {
-    int fd;
-    struct ifreq ifr;
-
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         perror("Cannot create the socket to get the IP address");
         return -1;
     }
 
+    struct ifreq ifr;  // Allocate on the stack, no malloc needed
+
     // Copy the interface name into the ifreq structure
-    strncpy(ifr.ifr_name, interface, IFNAMSIZ - 1);
-    ifr.ifr_name[IFNAMSIZ - 1] = '\0'; 
+    strncpy(ifr.ifr_name, interface, IF_NAMESIZE - 1);
+    ifr.ifr_name[IF_NAMESIZE - 1] = '\0'; 
 
     // Get the IP address of the interface
     if (ioctl(fd, SIOCGIFADDR, &ifr) == -1) {
@@ -262,6 +267,18 @@ int get_current_host_IP(const char *interface, char *ip_address, size_t size) {
     return 0;
 }
 
+
+void clean_up_listen_for_new_nodes(void *args){
+    Buffer *buf = (Buffer *) args;
+
+    if(buf != NULL){
+        if(buf->buffer != NULL) {
+            free(buf->buffer);
+        }
+        free(buf);
+    }
+    printf("Cleanup completed.\n");
+}
 //TODO implement adding the found device into our p2p network
 void *listen_for_new_nodes(void *arg){
     printf("am listen_for_new_nodes : \n");
@@ -281,11 +298,16 @@ void *listen_for_new_nodes(void *arg){
     buffer->buffer = (unsigned char *) malloc(255);
     if(buffer->buffer == NULL){
         perror("Error while allocating for listen function");
+        free(buffer);
         exit(MEMORY_ALLOCATION_ERROR);
     }
     
+    pthread_cleanup_push(clean_up_listen_for_new_nodes, buffer);
     if((rec_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
         perror("Error while creating listen socket");
+        free(buffer->buffer);
+        free(buffer);
+        exit(CREATE_SOCKET_ERROR);
     }
     discovered_node.sin_family = AF_INET;
     discovered_node.sin_port = htons(BROAD_CAST_PORT_NUMBER);
@@ -332,7 +354,6 @@ void *listen_for_new_nodes(void *arg){
         printf("\n recive from client : %s \n", buffer->buffer);
     }
     close(rec_socket);
-    free(buffer->buffer);
-    free(buffer);
+    pthread_cleanup_pop(1);
     return NULL;
 }

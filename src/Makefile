@@ -5,7 +5,7 @@
 CC = gcc
 
 # Compiler flags (optional)
-CFLAGS = -Wall -g
+CFLAGS =  -g -Wall -Wextra -fsanitize=address -fsanitize=undefined -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE -pie -z relro -z now 
 
 # Libraries to link with (OpenSSL)
 LIBS = -lssl -lcrypto
