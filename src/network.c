@@ -344,7 +344,7 @@ void *listen_for_new_nodes(void *arg){
         }
 
         if (strcmp(current_ip, client_ip) == 0) {
-            printf("Skipping the node, it's the current host\n");
+            // printf("Skipping the node, it's the current host\n");
             continue;
         }
 
